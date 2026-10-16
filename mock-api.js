@@ -61,6 +61,44 @@ app.post("/api/tasks", (req, res) => {
   res.status(201).json(newTask);
 });
 
+app.patch("/api/tasks/:id", (req, res) => {
+  const tasks = readTasks();
+  const index = tasks.findIndex((task) => task.id === Number(req.params.id));
+
+  if (index === -1) {
+    return res.status(404).json({
+      message: "Tugas tidak ditemukan",
+    });
+  }
+
+  const { id, ...updates } = req.body;
+
+  tasks[index] = {
+    ...tasks[index],
+    ...updates,
+  };
+
+  saveTasks(tasks);
+  res.json(tasks[index]);
+});
+
+app.delete("/api/tasks/:id", (req, res) => {
+  const tasks = readTasks();
+
+  const filteredTasks = tasks.filter(
+    (task) => task.id !== Number(req.params.id),
+  );
+
+  if (filteredTasks.length === tasks.length) {
+    return res.status(404).json({
+      message: "Tugas tidak ditemukan",
+    });
+  }
+
+  saveTasks(filteredTasks);
+  res.status(204).end();
+});
+
 app.listen(PORT, () => {
   console.log(`Mock API berjalan di http://localhost:${PORT}`);
 });

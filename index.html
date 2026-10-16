@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Task Tracker Kuliah</title>
+    <link rel="stylesheet" href="style.css" />
+    <!-- defer: script baru jalan setelah seluruh HTML selesai dibaca -->
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <main class="card">
+      <h1>🌸 Task Tracker Kuliah 🌸</h1>
+
+      <!-- novalidate: validasi kita lakukan sendiri lewat JavaScript -->
+      <form id="form-tugas" novalidate>
+        <input
+          type="text"
+          id="judul"
+          placeholder="Judul tugas"
+          autocomplete="off"
+        />
+
+        <div class="baris">
+          <select id="matkul">
+            <option>Ethical Hacking and Cyber Security</option>
+            <option>Internet Of Things</option>
+            <option>Komunikasi Data dan Jaringan Komputer</option>
+            <option>Keamanan Jaringan Komputer</option>
+            <option>Pemrograman Web</option>
+            <option>Pemrograman Mobile</option>
+          </select>
+          <input type="date" id="deadline" />
+          <button type="submit" class="tambah">Tambah!</button>
+        </div>
+
+        <!-- Pesan error tampil di halaman (bukan alert) -->
+        <p id="pesan-error" class="error" role="alert"></p>
+      </form>
+
+      <div class="bar">
+        <div class="filter">
+          <button class="on" data-filter="semua">Semua</button>
+          <button data-filter="aktif">Aktif</button>
+          <button data-filter="selesai">Selesai</button>
+        </div>
+        <span id="counter">0 tugas aktif</span>
+      </div>
+
+      <ul id="daftar"></ul>
+      <p id="kosong" class="kosong" hidden>Belum ada tugas. 🎀</p>
+
+      <button type="button" id="hapus-selesai" class="hapus-selesai" hidden>
+        Hapus yang selesai
+      </button>
+    </main>
+  </body>
+</html>
