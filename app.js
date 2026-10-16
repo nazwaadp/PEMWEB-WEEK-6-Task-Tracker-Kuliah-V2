@@ -1,4 +1,6 @@
-// 1. Ambil elemen dari HTML
+
+const API_URL = "http://localhost:3000/api/tasks";
+
 const form = document.getElementById("form-tugas");
 const inputJudul = document.getElementById("judul");
 const inputMatkul = document.getElementById("matkul");
@@ -10,46 +12,68 @@ const pesanKosong = document.getElementById("kosong");
 const tombolFilter = document.querySelectorAll(".filter button");
 const tombolHapusSelesai = document.getElementById("hapus-selesai");
 
-// 2. State (data utama aplikasi)
-const STORAGE_KEY = "task-tracker-kuliah";
-let tasks = muatDariStorage();
-let filterAktif = "semua"; // 'semua' | 'aktif' | 'selesai'
+let tasks = [];
+let filterAktif = "semua";
 
-// 3. localStorage
-function muatDariStorage() {
+function dariAPI(task) {
+  return {
+    id: task.id,
+    judul: task.title,
+    matkul: task.matkul || task.description || "",
+    deadline: task.deadline || "",
+    selesai: Boolean(task.completed)
+  };
+}
+
+async function requestAPI(url, options = {}) {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Request gagal: HTTP ${response.status}`);
+  }
+
+  if (response.status === 204) return null;
+
+  return response.json();
+}
+
+async function muatDariAPI() {
   try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
+    const data = await requestAPI(API_URL);
+    tasks = data.map(dariAPI);
+    render();
   } catch (err) {
-    return [];
+    pesanError.textContent =
+      "Gagal mengambil data. Pastikan server API berjalan.";
+    console.error(err);
   }
 }
 
-function simpanKeStorage() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-}
-
-// 4. render(): SATU fungsi yang membangun seluruh tampilan
 function render() {
-  // Tanggal hari ini format YYYY-MM-DD (zona waktu lokal)
   const hariIni = new Date().toLocaleDateString("en-CA");
-  // a. Filter sesuai tombol yang aktif
+
   let tampil = tasks.filter(function (t) {
     if (filterAktif === "aktif") return !t.selesai;
     if (filterAktif === "selesai") return t.selesai;
     return true;
   });
 
-  // b. Bonus: urutkan deadline terdekat
   tampil = tampil.slice().sort(function (a, b) {
     return a.deadline.localeCompare(b.deadline);
   });
 
-  // c. Kosongkan daftar, lalu bangun ulang
-  daftar.innerHTML = ""; // hanya mengosongkan, tidak memasukkan teks user
+  daftar.innerHTML = "";
+
   tampil.forEach(function (t) {
     const li = document.createElement("li");
-    li.dataset.id = t.id; // simpan id di elemen untuk event delegation
+    li.dataset.id = t.id;
+
     if (t.selesai) li.classList.add("selesai");
 
     const cek = document.createElement("input");
@@ -61,14 +85,14 @@ function render() {
 
     const judul = document.createElement("span");
     judul.className = "judul";
-    judul.textContent = t.judul; // textContent, BUKAN innerHTML
+    judul.textContent = t.judul;
 
     const meta = document.createElement("span");
     meta.className = "meta";
-    meta.textContent = t.matkul + " · deadline " + t.deadline;
+    meta.textContent = t.matkul + " · deadline " +
+      (t.deadline || "belum ditentukan");
 
-    // Belum selesai + deadline sudah lewat = terlambat
-    if (!t.selesai && t.deadline < hariIni) {
+    if (!t.selesai && t.deadline && t.deadline < hariIni) {
       li.classList.add("terlambat");
       meta.textContent += " · terlambat!";
     }
@@ -78,99 +102,106 @@ function render() {
     const hapus = document.createElement("button");
     hapus.className = "hapus";
     hapus.type = "button";
-    hapus.textContent = "✕";
+    hapus.textContent = "×";
     hapus.setAttribute("aria-label", "Hapus tugas");
 
     li.append(cek, info, hapus);
     daftar.appendChild(li);
   });
 
-  // d. Counter tugas aktif (dihitung dari SEMUA tugas, bukan hasil filter)
-  const jumlahAktif = tasks.filter(function (t) {
-    return !t.selesai;
-  }).length;
+  const jumlahAktif = tasks.filter(t => !t.selesai).length;
   counter.textContent = jumlahAktif + " tugas aktif";
 
-  // e. Pesan saat daftar kosong
   pesanKosong.hidden = tampil.length > 0;
-  if (tasks.length === 0) {
-    pesanKosong.textContent = "Belum ada tugas. 🎀";
-  } else {
-    pesanKosong.textContent = "Tidak ada tugas di filter ini. 🎀";
-  }
+  pesanKosong.textContent = tasks.length === 0
+    ? "Belum ada tugas. 🎀"
+    : "Tidak ada tugas di filter ini. 🎀";
 
-  // f. Tombol hapus-selesai hanya muncul kalau ada tugas yang selesai
-  tombolHapusSelesai.hidden = !tasks.some(function (t) {
-    return t.selesai;
-  });
+  tombolHapusSelesai.hidden = !tasks.some(t => t.selesai);
 
-  // g. Tandai tombol filter aktif dengan class "on"
   tombolFilter.forEach(function (btn) {
     btn.classList.toggle("on", btn.dataset.filter === filterAktif);
   });
 }
 
-// 5. Form tambah tugas
-form.addEventListener("submit", function (e) {
-  e.preventDefault(); // cegah halaman reload
+form.addEventListener("submit", async function (e) {
+  e.preventDefault();
 
   const judul = inputJudul.value.trim();
   const matkul = inputMatkul.value;
   const deadline = inputDeadline.value;
 
-  // Validasi: judul >= 3 karakter, deadline wajib
   if (judul.length < 3) {
-    pesanError.textContent = "Judul tugas minimal berisi 3 karakter. 🎀";
+    pesanError.textContent = "Judul tugas minimal berisi 3 karakter.";
     return;
   }
+
   if (!deadline) {
-    pesanError.textContent = "Deadline wajib diisi. 🎀";
+    pesanError.textContent = "Deadline wajib diisi.";
     return;
   }
 
-  pesanError.textContent = ""; // validasi lolos, hapus pesan error
+  pesanError.textContent = "";
 
-  tasks.push({
-    id: Date.now(), // id unik sederhana
-    judul: judul,
-    matkul: matkul,
-    deadline: deadline,
-    selesai: false,
-  });
+  try {
+    const tugasBaru = await requestAPI(API_URL, {
+      method: "POST",
+      body: JSON.stringify({
+        title: judul,
+        description: matkul,
+        matkul: matkul,
+        deadline: deadline
+      })
+    });
 
-  simpanKeStorage();
-  form.reset();
-  render();
+    tasks.push(dariAPI(tugasBaru));
+    form.reset();
+    render();
+  } catch (err) {
+    pesanError.textContent = "Gagal menambahkan tugas.";
+    console.error(err);
+  }
 });
 
-// 6. Event delegation: 1 listener di <ul> untuk semua item
-daftar.addEventListener("click", function (e) {
+daftar.addEventListener("click", async function (e) {
   const li = e.target.closest("li");
   if (!li) return;
+
   const id = Number(li.dataset.id);
+  const tugas = tasks.find(t => t.id === id);
+  if (!tugas) return;
 
-  // Klik tombol hapus
-  if (e.target.closest(".hapus")) {
-    tasks = tasks.filter(function (t) {
-      return t.id !== id;
-    });
-    simpanKeStorage();
-    render();
-    return;
-  }
+  try {
+    if (e.target.closest(".hapus")) {
+      await requestAPI(`${API_URL}/${id}`, {
+        method: "DELETE"
+      });
 
-  // Klik checkbox
-  if (e.target.matches('input[type="checkbox"]')) {
-    const tugas = tasks.find(function (t) {
-      return t.id === id;
-    });
-    if (tugas) tugas.selesai = e.target.checked;
-    simpanKeStorage();
-    render();
+      tasks = tasks.filter(t => t.id !== id);
+      render();
+      return;
+    }
+
+    if (e.target.matches('input[type="checkbox"]')) {
+      const selesaiBaru = e.target.checked;
+
+      await requestAPI(`${API_URL}/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          completed: selesaiBaru
+        })
+      });
+
+      tugas.selesai = selesaiBaru;
+      render();
+    }
+  } catch (err) {
+    pesanError.textContent = "Gagal mengubah data tugas.";
+    console.error(err);
+    await muatDariAPI();
   }
 });
 
-// 7. Filter Semua / Aktif / Selesai
 tombolFilter.forEach(function (btn) {
   btn.addEventListener("click", function () {
     filterAktif = btn.dataset.filter;
@@ -178,14 +209,25 @@ tombolFilter.forEach(function (btn) {
   });
 });
 
-// 8. Hapus semua tugas yang sudah selesai
-tombolHapusSelesai.addEventListener("click", function () {
-  tasks = tasks.filter(function (t) {
-    return !t.selesai;
-  });
-  simpanKeStorage();
-  render();
+tombolHapusSelesai.addEventListener("click", async function () {
+  const tugasSelesai = tasks.filter(t => t.selesai);
+
+  try {
+    await Promise.all(
+      tugasSelesai.map(t =>
+        requestAPI(`${API_URL}/${t.id}`, {
+          method: "DELETE"
+        })
+      )
+    );
+
+    tasks = tasks.filter(t => !t.selesai);
+    render();
+  } catch (err) {
+    pesanError.textContent = "Gagal menghapus semua tugas selesai.";
+    console.error(err);
+    await muatDariAPI();
+  }
 });
 
-// 9. Tampilkan data saat halaman pertama dibuka
-render();
+muatDariAPI();

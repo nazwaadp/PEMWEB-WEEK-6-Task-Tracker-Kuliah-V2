@@ -19,6 +19,7 @@
   },
   "homepage": "https://github.com/nazwaadp/PEMWEB-WEEK-6-Task-Tracker-Kuliah-V2#readme",
   "dependencies": {
+    "cors": "^2.8.6",
     "express": "^5.3.0"
   }
 }
